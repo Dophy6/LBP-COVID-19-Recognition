@@ -1,4 +1,4 @@
-import random, json
+import random, json, time
 import numpy as np
 from threading import Thread
 from skimage.feature import local_binary_pattern
@@ -188,10 +188,23 @@ def match(refs, img):
             best_name = name
     return best_name
 
-
-if __name__ == "__main__":
-    json_results = {}
+def test(radius, first_threshold, second_threshold):
     
+    global TRAINING_IMGS_NUMBER
+    global NON_COVID_PATH
+    global COVID_PATH
+    global LBP
+    global TRAINING_COVID_IMGS
+    global TRAINING_NON_COVID_IMGS
+    global TEST_IMGS_NUMBER
+    global TEST_COVID_IMGS
+    global TEST_NON_COVID_IMGS
+    global REFS
+
+
+    LBP["radius"] = radius
+
+    json_results = {}
     for i in range(10):
         temp_data = {}
         temp_data["training_set"] = load_random_training_set(TRAINING_IMGS_NUMBER, [NON_COVID_PATH, COVID_PATH])
@@ -219,8 +232,11 @@ if __name__ == "__main__":
         #temp_data["method_3_avg_divergences_limit"] = 0.025
 
         #TEST 9,10,11
-        temp_data["method_2_avg_difference_limit"] = 0.003
-        temp_data["method_3_avg_divergences_limit"] = 0.01
+        #temp_data["method_2_avg_difference_limit"] = 0.003
+        #temp_data["method_3_avg_divergences_limit"] = 0.01
+
+        temp_data["method_2_avg_difference_limit"] = first_threshold
+        temp_data["method_3_avg_divergences_limit"] = second_threshold
 
 
         first_method_thread = Thread(target=method_1, args=(lbps_collections,))
@@ -241,12 +257,14 @@ if __name__ == "__main__":
         all_refs_together = {}
         
         for key in temp_data["references"].keys():
-            temp_data["success_counter"][key] = sum([ 1 for img in TEST_COVID_IMGS if str(match(temp_data["references"][key], img)).startswith("COV")])
-            temp_data["success_counter"][key] += sum([ 1 for img in TEST_NON_COVID_IMGS if str(match(temp_data["references"][key], img)).startswith("NON")])
+            temp_data["success_counter"][key] = {}
+            temp_data["success_counter"][key]["COV"] = sum([ 1 for img in TEST_COVID_IMGS if str(match(temp_data["references"][key], img)).startswith("COV")])
+            temp_data["success_counter"][key]["NON_C"] = sum([ 1 for img in TEST_NON_COVID_IMGS if str(match(temp_data["references"][key], img)).startswith("NON")])
             all_refs_together.update(temp_data["references"][key])
-
-        temp_data["success_counter"]["all_refs_together"] = sum([ 1 for img in TEST_COVID_IMGS if str(match(all_refs_together, img)).startswith("COV")])
-        temp_data["success_counter"]["all_refs_together"] += sum([ 1 for img in TEST_NON_COVID_IMGS if str(match(all_refs_together, img)).startswith("NON")])
+        
+        temp_data["success_counter"]["all_refs_together"] = {}
+        temp_data["success_counter"]["all_refs_together"]["COV"] = sum([ 1 for img in TEST_COVID_IMGS if str(match(all_refs_together, img)).startswith("COV")])
+        temp_data["success_counter"]["all_refs_together"]["NON_C"] = sum([ 1 for img in TEST_NON_COVID_IMGS if str(match(all_refs_together, img)).startswith("NON")])
 
         pprint(temp_data["success_counter"])
 
@@ -272,7 +290,43 @@ if __name__ == "__main__":
 
 
 
+if __name__ == "__main__":
+    #TEST radius = 3 --> 0,1,2,9
+    #TEST radius = 2 --> 3,4,5,10
+    #TEST radius = 1 --> 6,7,8,11
     
+    #TEST 0,3,6
+    #temp_data["method_2_avg_difference_limit"] = 0.05
+    #temp_data["method_3_avg_divergences_limit"] = 0.25
     
+    #TEST 1,4,7
+    #temp_data["method_2_avg_difference_limit"] = 0.01
+    #temp_data["method_3_avg_divergences_limit"] = 0.05
+    
+    #TEST 2,5,8
+    #temp_data["method_2_avg_difference_limit"] = 0.005
+    #temp_data["method_3_avg_divergences_limit"] = 0.025
 
-        
+    #TEST 9,10,11
+    #temp_data["method_2_avg_difference_limit"] = 0.003
+    #temp_data["method_3_avg_divergences_limit"] = 0.01
+
+    thresholds = [
+        (0.05,0.25),
+        (0.01, 0.05),
+        (0.005, 0.025),
+        (0.003, 0.01)
+    ]
+
+    all_radius = [1,2,3]
+
+    threads = []
+    counter = 0
+    msg = ""
+    for t in thresholds:
+        for r in all_radius:
+            msg += "test {}: r -> {}, t0 -> {}, t1 -> {}\n".format(counter, r, t[0], t[1])
+            counter += 1
+            test(r,t[0],t[1])
+
+    print(msg)
